@@ -1,0 +1,1 @@
+These tests are carried out with the assumption that the url used is correct
