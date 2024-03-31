@@ -107,7 +107,9 @@ const deleteRecipe = async (req, res) => {
     try {
         if ( !req.query.post ) return res.status(400).json({error:"Bad request"})
 
-        if (deletingRecipe(req.query.post))  return res.status(201).json({message: "Your recipe has been deleted successfully"})
+        const isDeleted = await deletingRecipe(req.query.post, req.query.user)
+
+        if (isDeleted)  return res.status(201).json({message: "Your recipe has been deleted successfully"})
 
         else return res.status(500).json({error:'Something went wrong. Please try again'})
     }

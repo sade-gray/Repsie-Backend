@@ -146,16 +146,49 @@ const updatingRecipe = async (id, data) => {
     })
 }
 
-const deletingRecipe = async (id) => {
-    let document = firestore.doc(`recipes/${id}`)
-    document.delete()
-        .then(() => {
-            return true
-        })
-        .catch(() => {
-            return 
-        })
-}
+const deletingRecipe = async (id, userId) => {
+    try {
+        await firestore.collection(`users/${userId}/savedRecipes`).doc(id).delete();
+        await firestore.doc(`recipes/${id}`).delete();
+        await firestore.doc(`users/${userId}/createdRecipes/${id}`).delete();
+        
+        return true;
+    } catch (error) {
+        console.error(error);
+        return false;
+    }
+};
+
+/*const deletingRecipe = async (id, uid) => {
+    try {
+        // Get all users
+        const usersSnapshot = await firestore.collection('users').get();
+        
+        // Loop through each user
+        const deletePromises = usersSnapshot.docs.map(async (userDoc) => {
+            const userId = userDoc.id;
+            console.log(userId)
+
+            // Delete document from savedRecipes collection under current user
+            await firestore.collection(`users/${userId}/savedRecipes`).doc(id).delete();
+
+            // Delete document from createdRecipes collection under current user
+            await firestore.collection(`users/${userId}/createdRecipes`).doc(id).delete();
+        });
+
+        // Wait for all delete operations to finish
+        await Promise.all(deletePromises);
+        
+        // Delete document from recipes collection
+        await firestore.collection('recipes').doc(id).delete();
+        
+        return true;
+    } catch (error) {
+        console.error('Error deleting recipe across users:', error);
+        return false;
+    }
+};*/
+
 
 
 const emailSignUp = async (email, password) => {
@@ -179,13 +212,59 @@ const emailSignUp = async (email, password) => {
         await firestore.collection(`users/${uid}/likes`)
             .doc("default")
             .set({default: "default"})
+
+        await firestore.collection(`users/${uid}/settings`)
+            .doc("settings")
+            .set({name: "",
+                phoneNum: ""
+            })
         
         return true
     } catch (err) {
-        console.log(err)
         return
     }
 };
+// only update phone number and name
+const userSettings = async (userSettingsUpdate, uid) => {
+    try {
+        let usernameExists = false;
+
+        // Check if username already exists
+        const checkUsername = await firestore.collection(`usernames`).get()
+        checkUsername.forEach(usernameDoc => {
+            const username = usernameDoc.id
+            if (userSettingsUpdate.name == username) {
+                usernameExists = true;
+            }
+        })
+        if (usernameExists) {
+            return false
+        }
+        await firestore.collection(`users/${uid}/settings`).doc("settings").update(userSettingsUpdate)
+        await firestore.collection(`usernames`).doc(userSettingsUpdate.name).set({ exists: true })
+        return true; 
+    }
+    catch (error) {
+        return false; 
+    }
+}
+
+
+const getUserSettings = async (uid) => {
+    try {
+        const settingsSnap = await firestore.collection(`users/${uid}/settings`).get();
+
+        if (settingsSnap.empty) {
+            return null
+        }
+
+        const userSettingsData = settingsSnap.docs[0].data()
+        return userSettingsData
+    } catch(error) {
+        return null
+    }
+}
+
 
 
 const emailUserUpdate = async (uid, updatedData) => {
@@ -220,19 +299,13 @@ const tokenGen = async (email) => {
  */
 
 const verifyCredentials = async (email, password) => {
-admin.auth().getUserByEmail(email)
+admin.auth().signInWithEmailAndPassword(email)
 .then((userRecord) => {
-    const storedHashedPassword = userRecord.password;
-    console.log(storedHashedPassword)
-
-    if (storedHashedPassword == password) {
-        console.log('Passwords match!')
-    } else {
-        console.log('Passwords do not match.');
-    }
+    console.log(userRecord.user.uid)
+    return true
 })
 .catch((error) => {
-    console.error('Error fetching user data:', error);
+    return false
 })
 }
 
@@ -394,6 +467,36 @@ const deleteComment = async (commentId, post) => {
     }
 }
 
+const searchByTitle = async (searchItem) => {
+    let collectionRef = firestore.collection('recipes');
+let searchItemLowerCase = searchItem.toLowerCase(); // Convert search term to lowercase for case-insensitive matching
+
+return collectionRef.get().then(querySnapshot => {
+    let filteredDocs = querySnapshot.docs.filter(documentSnapshot => {
+        let recipeData = documentSnapshot.data();
+        let titleLowerCase = recipeData.title.toLowerCase(); // Convert title to lowercase for case-insensitive matching
+        return titleLowerCase.includes(searchItemLowerCase);
+    });
+
+    if (filteredDocs.length === 0) {
+        return []; // Return empty array if no matching documents found
+    }
+
+    return filteredDocs.map(documentSnapshot => {
+        let recipeData = documentSnapshot.data();
+        return {
+            id: documentSnapshot.id,
+            title: recipeData.title,
+            timeRating: recipeData.timeRating,
+            skillRating: recipeData.skillRating,
+            userId: recipeData.userId,
+        };
+    });
+});
+    
+}
+
+
 const upload = async (fileContent) => {
     try {   
 
@@ -404,6 +507,7 @@ const upload = async (fileContent) => {
 }
 
 module.exports = {
+    getRecipe,
     emailSignUp,
     verifyCredentials,
     getRecipes,
@@ -427,5 +531,8 @@ module.exports = {
     postComment, 
     deleteComment, 
     upload,
-    getRecipe
+    searchByTitle, 
+    userSettings, 
+    getUserSettings, 
+    getUserSettings
 }

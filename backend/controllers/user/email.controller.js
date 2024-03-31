@@ -1,4 +1,4 @@
-const { emailSignUp, message, emailUserUpdate, tokenGen, verifyCredentials} = require('../../cloud.firestore/firestoreNodeJS.js')
+const { emailSignUp, message, emailUserUpdate, tokenGen, verifyCredentials, userSettings, getUserSettings} = require('../../cloud.firestore/firestoreNodeJS.js')
 
 const signInByEmail = async (req, res) => {
     try{
@@ -49,7 +49,7 @@ const signUpByEmail = async (req, res) => {
                     message: 'Your new account has been created. Please log in',
                 });
             } else {
-                return res.status(500).json({ error: 'Internal server error' });
+                return res.status(500).json({ error: 'The email address is already in use by another account.' });
             }
         }
     } catch (error) {
@@ -81,8 +81,9 @@ const updateUserEmailDetails = async (req, res) => {
     }
 }
 
+
 module.exports = {
     signInByEmail, 
     signUpByEmail,
-    updateUserEmailDetails
+    updateUserEmailDetails, 
 }
